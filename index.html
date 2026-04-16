@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>secret_message.py</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,600;0,700;1,400&family=Cormorant+Garamond:ital,wght@0,300;1,300;1,500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#0D0F0E; --surface:#131715; --border:#1E2820;
+  --green:#4AFF91; --green-dim:#1A6B3A;
+  --amber:#FFB347; --amber-dim:#7A4A10;
+  --red:#FF5F5F; --red-dim:#6B1A1A;
+  --blue:#7DD3FC; --muted:#3D4F42;
+  --text:#C8DBC0; --text-dim:#5A7060;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--text);font-family:'JetBrains Mono',monospace;min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.03) 2px,rgba(0,0,0,.03) 4px);pointer-events:none;z-index:100}
+
+/* BOOT */
+#boot{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:200;padding:24px}
+.boot-logo{font-size:12px;color:var(--green);text-align:center;white-space:pre;line-height:1.3;margin-bottom:28px;animation:flicker 4s ease-in-out infinite}
+@keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.7}94%{opacity:1}97%{opacity:.85}98%{opacity:1}}
+.boot-lines{width:100%;max-width:480px}
+.boot-line{font-size:12px;color:var(--text-dim);padding:2px 0;opacity:0;animation:fi .15s forwards}
+.boot-line.ok::after{content:' [OK]';color:var(--green)}
+.boot-line.warn::after{content:' [WARN]';color:var(--amber)}
+@keyframes fi{to{opacity:1}}
+.boot-bar-wrap{width:100%;max-width:480px;height:2px;background:var(--border);border-radius:2px;margin-top:20px;overflow:hidden}
+.boot-bar{height:100%;background:var(--green);width:0;transition:width 2s ease;box-shadow:0 0 10px var(--green)}
+
+/* APP */
+#app{display:none;padding:0 0 80px;max-width:680px;margin:0 auto}
+
+/* TOPBAR */
+.topbar{display:flex;align-items:center;gap:8px;padding:12px 20px;border-bottom:1px solid var(--border);position:sticky;top:0;background:rgba(13,15,14,.95);backdrop-filter:blur(8px);z-index:10}
+.tb-dot{width:10px;height:10px;border-radius:50%}
+.tb-dot.r{background:#FF5F57}.tb-dot.y{background:#FEBC2E}.tb-dot.g{background:#28C840}
+.tb-title{font-size:12px;color:var(--text-dim);margin-left:8px;flex:1;text-align:center}
+.tb-stage{font-size:11px;color:var(--green)}
+
+/* STAGE DOTS */
+.stages{display:flex;padding:20px 20px 0}
+.stage-dot{flex:1;height:3px;background:var(--border);border-radius:2px;margin:0 3px;transition:background .4s}
+.stage-dot.active{background:var(--amber);box-shadow:0 0 8px var(--amber)}
+.stage-dot.done{background:var(--green);box-shadow:0 0 8px var(--green)}
+
+/* SECTIONS */
+.section{padding:24px 20px 0;display:none}
+.section.visible{display:block}
+@keyframes enter{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.section-enter{animation:enter .35s ease forwards}
+
+.prompt-line{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.prompt{color:var(--green);font-size:13px}
+.prompt-text{font-size:13px;color:var(--text-dim)}
+.section-label{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.section-label::after{content:'';flex:1;height:1px;background:var(--border)}
+.task-desc{background:rgba(255,179,71,.06);border:1px solid var(--amber-dim);border-left:3px solid var(--amber);border-radius:0 6px 6px 0;padding:12px 14px;font-size:12px;color:var(--text-dim);line-height:1.7;margin-bottom:16px}
+.task-desc strong{color:var(--amber)}
+
+/* DISPLAY CODE BOX */
+.task-box{background:#090B0A;border:1px solid var(--border);border-radius:8px;padding:18px;margin-bottom:16px;font-size:13px;line-height:2;white-space:pre;overflow-x:auto;font-family:'JetBrains Mono',monospace}
+.ln{display:inline-block;color:var(--muted);user-select:none;min-width:26px;text-align:right;margin-right:16px;font-size:11px}
+
+/* SYNTAX COLORS */
+.hl-kw{color:#C792EA}.hl-fn{color:#82AAFF}.hl-str{color:#FFB347}
+.hl-num{color:#F78C6C}.hl-cmt{color:#3D5040;font-style:italic}.hl-var{color:var(--text)}
+
+/* OVERLAY EDITOR */
+.editor-label{font-size:10px;color:var(--text-dim);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px}
+.editor-wrap{position:relative;background:#090B0A;border:1px solid var(--border);border-radius:8px;margin-bottom:14px;transition:border-color .2s,box-shadow .2s}
+.editor-wrap:focus-within{border-color:var(--green-dim);box-shadow:0 0 0 2px rgba(74,255,145,.07)}
+.editor-overlay{position:absolute;top:0;left:0;width:100%;height:100%;padding:16px;font:13px/1.8 'JetBrains Mono',monospace;white-space:pre-wrap;word-break:break-word;overflow-wrap:break-word;pointer-events:none;overflow:hidden;border-radius:8px;color:var(--text);tab-size:4}
+.code-editor{display:block;position:relative;width:100%;min-height:200px;padding:16px;background:transparent;color:transparent;caret-color:#C8DBC0;border:none;outline:none;font:13px/1.8 'JetBrains Mono',monospace;resize:vertical;z-index:1;white-space:pre-wrap;word-break:break-word;tab-size:4}
+.code-editor::placeholder{color:var(--muted)}
+
+/* BUTTONS */
+.btn{width:100%;padding:14px;border-radius:8px;border:1px solid var(--green-dim);background:transparent;color:var(--green);font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;letter-spacing:1px;cursor:pointer;transition:all .2s;text-transform:uppercase}
+.btn:hover{background:rgba(74,255,145,.08);box-shadow:0 0 20px rgba(74,255,145,.15)}
+.btn.amber{border-color:var(--amber-dim);color:var(--amber)}
+.btn.amber:hover{background:rgba(255,179,71,.08);box-shadow:0 0 20px rgba(255,179,71,.15)}
+.btn.hint{padding:10px;font-size:11px;border-color:var(--border);color:var(--text-dim)}
+.btn.hint:hover{border-color:var(--amber-dim);color:var(--amber);background:rgba(255,179,71,.06)}
+.btn.hint.revealed{border-color:var(--amber-dim);color:var(--amber);background:rgba(255,179,71,.06);cursor:default}
+.btn.hint.revealed:hover{box-shadow:none}
+.hint-row{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
+
+/* HINT POPUP */
+.hint-box{background:rgba(255,179,71,.06);border:1px solid var(--amber-dim);border-radius:6px;padding:10px 14px;font-size:12px;color:var(--amber);margin-bottom:8px;display:none;line-height:1.6;animation:sd .25s ease}
+.hint-box.visible{display:block}
+@keyframes sd{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+
+/* OUTPUT / ERROR */
+.output-box{background:#090B0A;border:1px solid var(--green-dim);border-radius:8px;padding:14px 16px;font-size:13px;line-height:1.8;color:var(--green);margin:12px 0;box-shadow:0 0 20px rgba(74,255,145,.08);display:none}
+.output-box.visible{display:block}
+.output-line{display:flex;gap:8px}
+.oa{color:var(--green-dim)}
+.error-box{background:rgba(255,95,95,.06);border:1px solid var(--red-dim);border-radius:8px;padding:12px 16px;font-size:12px;color:var(--red);margin:10px 0;display:none;line-height:1.7}
+.error-box.visible{display:block}
+
+/* S2 — PRINT FIX */
+.final-code{background:#090B0A;border:1px solid var(--red-dim);border-radius:8px;padding:18px;font-size:14px;color:var(--red);text-align:center;margin-bottom:16px;box-shadow:0 0 20px rgba(255,95,95,.08);letter-spacing:.5px}
+.final-input{width:100%;background:#090B0A;border:1px solid var(--border);border-radius:8px;padding:14px 16px;color:var(--green);font-family:'JetBrains Mono',monospace;font-size:14px;outline:none;margin-bottom:12px;transition:border-color .2s;caret-color:var(--green);text-align:center}
+.final-input:focus{border-color:var(--green-dim)}
+
+/* S3 — CIPHER */
+.cipher-box{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px;margin-bottom:16px;text-align:center}
+.cipher-encrypted{font-size:18px;font-weight:700;color:var(--amber);letter-spacing:3px;line-height:1.6;text-shadow:0 0 20px rgba(255,179,71,.3);margin-bottom:6px}
+.cipher-desc{font-size:11px;color:var(--text-dim);letter-spacing:1px}
+.napoleon-card{background:rgba(125,211,252,.04);border:1px solid rgba(125,211,252,.15);border-radius:8px;padding:16px;margin-bottom:16px;font-size:12px;color:var(--text-dim);line-height:1.8}
+.napoleon-card .nt{color:var(--blue);font-size:13px;font-weight:600;margin-bottom:8px}
+.cipher-input{width:100%;background:#090B0A;border:1px solid var(--border);border-radius:8px;padding:14px 16px;color:var(--amber);font-family:'JetBrains Mono',monospace;font-size:14px;letter-spacing:2px;text-transform:uppercase;outline:none;margin-bottom:12px;transition:border-color .2s;caret-color:var(--amber)}
+.cipher-input:focus{border-color:var(--amber-dim)}
+.cipher-input::placeholder{color:var(--muted);text-transform:none;letter-spacing:0;font-size:12px}
+
+/* S4 — INVITE CODE */
+.invite-code-box{background:#090B0A;border:1px solid var(--green-dim);border-radius:8px;padding:20px;margin-bottom:16px;font-size:13px;line-height:2;white-space:pre;overflow-x:auto;font-family:'JetBrains Mono',monospace;box-shadow:0 0 24px rgba(74,255,145,.07)}
+
+/* REVEAL */
+#reveal{display:none;padding:40px 20px;text-align:center;animation:fi .6s ease}
+#reveal.visible{display:block}
+.reveal-heart{font-size:40px;margin-bottom:14px;animation:hb 1.4s ease-in-out infinite}
+@keyframes hb{0%,100%{transform:scale(1)}14%{transform:scale(1.15)}28%{transform:scale(1)}42%{transform:scale(1.1)}56%{transform:scale(1)}}
+.reveal-title{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:36px;font-weight:300;color:var(--green);margin-bottom:10px;line-height:1.2;animation:glow 2s ease-in-out infinite alternate}
+@keyframes glow{from{text-shadow:0 0 20px rgba(74,255,145,.3)}to{text-shadow:0 0 60px rgba(74,255,145,.7)}}
+.reveal-sub{font-size:12px;color:var(--text-dim);letter-spacing:2px;text-transform:uppercase;margin-bottom:28px}
+.reveal-message{background:var(--surface);border:1px solid var(--green-dim);border-radius:12px;padding:24px;margin-bottom:20px;box-shadow:0 0 40px rgba(74,255,145,.08);font-size:14px;line-height:1.9;color:var(--text);text-align:left}
+.reveal-message p{margin-bottom:10px}
+.reveal-message p:last-child{margin:0}
+
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+.cb{display:inline-block;width:8px;height:14px;background:var(--green);vertical-align:text-bottom;margin-left:2px;animation:blink .9s step-end infinite}
+#particles{position:fixed;inset:0;pointer-events:none;z-index:50;display:none}
+</style>
+</head>
+<body>
+
+<!-- BOOT -->
+<div id="boot">
+  <div class="boot-logo">
+███████╗███████╗ ██████╗██████╗ ███████╗████████╗
+██╔════╝██╔════╝██╔════╝██╔══██╗██╔════╝╚══██╔══╝
+███████╗█████╗  ██║     ██████╔╝█████╗     ██║   
+╚════██║██╔══╝  ██║     ██╔══██╗██╔══╝     ██║   
+███████║███████╗╚██████╗██║  ██║███████╗   ██║   
+╚══════╝╚══════╝ ╚═════╝╚═╝  ╚═╝╚══════╝   ╚═╝   
+        <span style="color:var(--text-dim)">secret_message.py  v1.0.0</span></div>
+  <div class="boot-lines" id="boot-lines"></div>
+  <div class="boot-bar-wrap"><div class="boot-bar" id="boot-bar"></div></div>
+</div>
+
+<div id="app">
+  <div class="topbar">
+    <div class="tb-dot r"></div><div class="tb-dot y"></div><div class="tb-dot g"></div>
+    <div class="tb-title">secret_message.py</div>
+    <div class="tb-stage" id="tb-stage">STAGE 1/3</div>
+  </div>
+  <div class="stages">
+    <div class="stage-dot active" id="sd0"></div>
+    <div class="stage-dot" id="sd1"></div>
+    <div class="stage-dot" id="sd2"></div>
+  </div>
+
+  <!-- ══ S1: DEBUG ══ -->
+  <div class="section visible section-enter" id="s1">
+    <div style="padding-top:6px"></div>
+    <div class="prompt-line"><span class="prompt">►</span><span class="prompt-text">python secret_message.py</span></div>
+    <div style="margin:20px 0 10px"><div class="section-label">Stage 01 — debug</div></div>
+    <div class="task-desc">
+      <strong>Задание:</strong> в коде ниже спрятаны <strong>3 бага</strong>.<br>
+      Найди и исправь все три — тогда программа запустится и покажет тебе кое-что важное.<span class="cb"></span>
+    </div>
+
+    <div class="task-box"><span class="ln">1</span><span class="hl-var">love_daniel</span> = <span class="hl-kw">False</span>
+
+<span class="ln">3</span><span class="hl-kw">def</span> <span class="hl-fn">check_feelings</span>(name<span style="color:var(--text-dim)">:</span> <span style="color:#7DD3FC">str</span>)
+<span class="ln">4</span>    <span class="hl-kw">if</span> love_daniel == <span class="hl-kw">True</span>:
+<span class="ln">5</span>        <span class="hl-fn">print</span>(<span class="hl-str">f"Привет, {name}!"</span>)
+<span class="ln">6</span>        <span class="hl-fn">print</span>(<span class="hl-str">"Проверка пройдена ✓"</span>)
+<span class="ln">7</span>        <span class="hl-fn">print</span>(<span class="hl-str">"Следующий уровень разблокирован 🔓"</span>)
+<span class="ln">8</span>        <span class="hl-fn">print</span>(<span class="hl-str">"Жди следующее сообщение..."</span>)
+<span class="ln">9</span>    <span class="hl-kw">else</span>:
+<span class="ln">10</span>        <span class="hl-fn">print</span>(<span class="hl-str">"ERROR 403: доступ закрыт 🚫"</span>)
+
+<span class="ln">12</span><span class="hl-fn">check_feelings</span>(<span class="hl-kw">Daniel</span>)</div>
+
+    <div class="hint-row">
+      <button class="btn hint" id="bh1" onclick="showBugHint(1)">🔑 &nbsp;Подсказка — Баг #1</button>
+      <button class="btn hint" id="bh2" onclick="showBugHint(2)">🔑 &nbsp;Подсказка — Баг #2</button>
+      <button class="btn hint" id="bh3" onclick="showBugHint(3)">🔑 &nbsp;Подсказка — Баг #3</button>
+    </div>
+    <div id="bh1-box" class="hint-box">🐛 <strong>Баг #1 — Строка 1:</strong> посмотри на значение переменной <strong>love_daniel</strong>. Программа никогда не зайдёт в нужную ветку.</div>
+    <div id="bh2-box" class="hint-box">🐛 <strong>Баг #2 — Строка 3:</strong> в объявлении функции <strong>check_feelings</strong> не хватает одного символа в самом конце.</div>
+    <div id="bh3-box" class="hint-box">🐛 <strong>Баг #3 — Строка 12:</strong> при вызове функции передаётся аргумент <strong>Daniel</strong>. Python не знает, что это такое.</div>
+
+    <div class="editor-label">// твой исправленный код</div>
+    <div class="editor-wrap">
+      <pre class="editor-overlay" id="ov1" aria-hidden="true"></pre>
+      <textarea class="code-editor" id="code-input" spellcheck="false"
+        oninput="syncOv('code-input','ov1')" onscroll="syncSc('code-input','ov1')"
+        placeholder="Вставь сюда исправленный код..."></textarea>
+    </div>
+
+    <div class="error-box" id="s1-err"></div>
+    <div class="output-box" id="s1-out">
+      <div class="output-line"><span class="oa">►</span>&nbsp;Привет, Daniel!</div>
+      <div class="output-line"><span class="oa">►</span>&nbsp;Проверка пройдена ✓</div>
+      <div class="output-line"><span class="oa">►</span>&nbsp;Следующий уровень разблокирован 🔓</div>
+      <div class="output-line"><span class="oa">►</span>&nbsp;Жди следующее сообщение...</div>
+    </div>
+    <button class="btn" onclick="chk1()">▶ &nbsp;RUN CODE</button>
+  </div>
+
+  <!-- ══ S2: PRINT FIX ══ -->
+  <div class="section" id="s2">
+    <div style="padding-top:6px"></div>
+    <div class="prompt-line"><span class="prompt">►</span><span class="prompt-text">python fix.py</span></div>
+    <div style="margin:20px 0 10px"><div class="section-label">Stage 02 — fix</div></div>
+    <div class="task-desc">
+      <strong>Ещё один баг.</strong> В коде закралась ошибка.<br>
+      Исправь строку — убери лишнее.<span class="cb"></span>
+    </div>
+    <div class="final-code">print("I do not love Daniel")</div>
+    <div class="editor-label">// исправленная строка</div>
+    <input type="text" class="final-input" id="fix-input" />
+    <div class="error-box" id="s2-err"></div>
+    <div class="output-box" id="s2-out">
+      <div class="output-line"><span class="oa">►</span>&nbsp;Компиляция успешна ✓</div>
+      <div class="output-line"><span class="oa">►</span>&nbsp;Следующий модуль разблокирован 🔓</div>
+    </div>
+    <button class="btn" onclick="chk2()">▶ &nbsp;RUN CODE</button>
+  </div>
+
+  <!-- ══ S3: CIPHER ══ -->
+  <div class="section" id="s3">
+    <div style="padding-top:6px"></div>
+    <div class="prompt-line"><span class="prompt">►</span><span class="prompt-text">decrypt --cipher napoleon message.enc</span></div>
+    <div style="margin:20px 0 10px"><div class="section-label">Stage 03 — decrypt</div></div>
+    <div class="task-desc">
+      <strong>Задание:</strong> перехвачено зашифрованное сообщение.<br>
+      Расшифруй его — и узнаешь, где и когда тебя ждут.<span class="cb"></span>
+    </div>
+    <div class="cipher-box">
+      <div class="cipher-encrypted">ТВХРЛЩГ · 17:00 · ТЦЫНЛРФНГВ</div>
+      <div class="cipher-desc">// encrypted with napoleon cipher</div>
+    </div>
+    <div class="napoleon-card">
+      <div class="nt">📖 &nbsp;Что такое шифр Наполеона?</div>
+      Шифр Наполеона — разновидность шифра Цезаря, которым пользовался сам Наполеон Бонапарт для секретной переписки во время военных походов.<br><br>
+      Принцип: <span style="color:var(--blue)">каждая буква сдвигается на фиксированное число позиций</span> по алфавиту.<br><br>
+      Чтобы расшифровать — нужно знать <span style="color:var(--amber)">величину сдвига</span> и <span style="color:var(--amber)">направление</span>.
+    </div>
+    <div class="hint-row">
+      <button class="btn hint" id="ch1" onclick="showCHint(1)">🔑 &nbsp;Подсказка 1 — величина сдвига</button>
+      <button class="btn hint" id="ch2" onclick="showCHint(2)" style="display:none">🔑 &nbsp;Подсказка 2 — направление</button>
+    </div>
+    <div id="ch1-box" class="hint-box">💡 <strong>Подсказка 1:</strong> величина сдвига равна <strong>3</strong>. Каждая буква была сдвинута на 3 позиции по алфавиту.</div>
+    <div id="ch2-box" class="hint-box">💡 <strong>Подсказка 2:</strong> сдвиг был сделан <strong>вперёд</strong> (А→Г). Чтобы расшифровать — сдвигай <strong>назад</strong> на 3: Г→А, Д→Б, Е→В...</div>
+
+    <div class="editor-label">// введи расшифрованное сообщение</div>
+    <input type="text" class="cipher-input" id="cipher-input" placeholder="Например: СЛОВО 00:00 МЕСТО" />
+    <div class="error-box" id="s3-err"></div>
+    <div class="output-box" id="s3-out">
+      <div class="output-line"><span class="oa">►</span>&nbsp;Дешифровка успешна ✓</div>
+      <div class="output-line"><span class="oa">►</span>&nbsp;Финальный файл разблокирован 🔓</div>
+    </div>
+    <button class="btn amber" onclick="chk3()">🔓 &nbsp;DECRYPT</button>
+  </div>
+
+  <!-- ══ S4: INVITE CODE ══ -->
+  <div class="section" id="s4">
+    <div style="padding-top:6px"></div>
+    <div class="prompt-line"><span class="prompt">►</span><span class="prompt-text">python invite.py</span></div>
+    <div style="margin:20px 0 10px"><div class="section-label">Final — invite.py</div></div>
+    <div class="task-desc">
+      <strong>Последний файл.</strong> Он был зашифрован всё это время.<br>
+      Запусти его — и узнаешь всё.<span class="cb"></span>
+    </div>
+
+    <!-- ════════════════════════════════════════════════
+         ДАНИЭЛЬ: замени код ниже на своё приглашение
+         ════════════════════════════════════════════════ -->
+    <div class="invite-code-box">
+<span class="hl-cmt"># 💌 invite.py</span>
+
+<span class="hl-var">name</span>  = <span class="hl-str">"Даниил"</span>
+<span class="hl-var">day</span>   = <span class="hl-str">"Пятница"</span>
+<span class="hl-var">time</span>  = <span class="hl-str">"17:00"</span>
+<span class="hl-var">place</span> = <span class="hl-str">"Пушкинская"</span>
+
+<span class="hl-fn">print</span>(<span class="hl-str">f"Привет, {name}! 💚"</span>)
+<span class="hl-fn">print</span>(<span class="hl-str">f"Жду тебя: {day} в {time}"</span>)
+<span class="hl-fn">print</span>(<span class="hl-str">f"Место встречи: {place}"</span>)
+<span class="hl-fn">print</span>(<span class="hl-str">"Ты придёшь?"</span>)</div>
+    <!-- ════════════════════════════════════════════════ -->
+
+    <button class="btn" style="margin-top:4px" onclick="runInvite()">▶ &nbsp;RUN CODE</button>
+  </div>
+
+  <!-- ══ REVEAL ══ -->
+  <div id="reveal">
+    <div class="reveal-heart">💚</div>
+    <div class="reveal-title">Программа<br>выполнена успешно</div>
+    <div class="reveal-sub">// execution complete · no errors</div>
+
+    <!-- ════════════════════════════════════════════════
+         ДАНИЭЛЬ: замени текст приглашения ниже
+         ════════════════════════════════════════════════ -->
+    <div class="reveal-message">
+      <p>Привет, Даниил! 💚</p>
+      <p>Жду тебя в <strong style="color:var(--green)">пятницу в 17:00</strong> на <strong style="color:var(--green)">Пушкинской</strong>.</p>
+      <p>Я тебя очень сильно люблю.<br>Очень сильно жду и скучаю.</p>
+      <p style="color:var(--text-dim);font-size:13px;">— написано с любовью и тремя багами<br>// by Daniel</p>
+    </div>
+    <!-- ════════════════════════════════════════════════ -->
+  </div>
+</div>
+
+<canvas id="particles"></canvas>
+<script>
+// ── SYNTAX HIGHLIGHTER ──
+const KW = new Set(['def','if','else','elif','True','False','None','return','and','or','not','in','for','while','class','import','from','pass','break','continue','lambda','with','as','try','except','finally','raise','yield','async','await']);
+
+function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function hl(text){
+  const out=[]; let i=0;
+  while(i<text.length){
+    const ch=text[i];
+    if(ch==='\n'){out.push('\n');i++;continue;}
+    if(ch==='#'){
+      let j=i; while(j<text.length&&text[j]!=='\n')j++;
+      out.push(`<span class="hl-cmt">${esc(text.slice(i,j))}</span>`);
+      i=j;continue;
+    }
+    if((ch==='f'||ch==='F')&&i+1<text.length&&(text[i+1]==='"'||text[i+1]==="'")){
+      const q=text[i+1]; let j=i+2;
+      while(j<text.length&&text[j]!==q&&text[j]!=='\n'){if(text[j]==='\\')j++;j++;}
+      if(j<text.length&&text[j]===q)j++;
+      out.push(`<span class="hl-str">${esc(text.slice(i,j))}</span>`);
+      i=j;continue;
+    }
+    if(ch==='"'||ch==="'"){
+      let j=i+1;
+      while(j<text.length&&text[j]!==ch&&text[j]!=='\n'){if(text[j]==='\\')j++;j++;}
+      if(j<text.length&&text[j]===ch)j++;
+      out.push(`<span class="hl-str">${esc(text.slice(i,j))}</span>`);
+      i=j;continue;
+    }
+    if(/[a-zA-Z_]/.test(ch)){
+      let j=i; while(j<text.length&&/[a-zA-Z0-9_]/.test(text[j]))j++;
+      const w=text.slice(i,j);
+      let k=j; while(k<text.length&&text[k]===' ')k++;
+      if(text[k]==='(') out.push(`<span class="hl-fn">${esc(w)}</span>`);
+      else if(KW.has(w)) out.push(`<span class="hl-kw">${esc(w)}</span>`);
+      else out.push(esc(w));
+      i=j;continue;
+    }
+    if(/[0-9]/.test(ch)){
+      let j=i; while(j<text.length&&/[0-9.]/.test(text[j]))j++;
+      out.push(`<span class="hl-num">${esc(text.slice(i,j))}</span>`);
+      i=j;continue;
+    }
+    out.push(esc(ch)); i++;
+  }
+  return out.join('');
+}
+
+function syncOv(taId,ovId){
+  const ta=document.getElementById(taId), ov=document.getElementById(ovId);
+  ov.innerHTML=hl(ta.value)+'\n';
+}
+function syncSc(taId,ovId){
+  const ta=document.getElementById(taId), ov=document.getElementById(ovId);
+  ov.scrollTop=ta.scrollTop;
+}
+
+// ── BOOT ──
+const BL=[
+  {text:'Initializing python runtime 3.12.0',cls:'ok',d:300},
+  {text:'Loading module: feelings.py',cls:'ok',d:600},
+  {text:'Loading module: cipher.py',cls:'ok',d:850},
+  {text:'Loading module: heart.py',cls:'ok',d:1100},
+  {text:'Memory: 3 bugs detected',cls:'warn',d:1350},
+  {text:'WARNING: love_daniel = False',cls:'warn',d:1550},
+  {text:'Preparing secret message...',cls:'ok',d:1800},
+];
+const bl=document.getElementById('boot-lines');
+BL.forEach(l=>setTimeout(()=>{
+  const d=document.createElement('div');
+  d.className='boot-line '+l.cls; d.textContent='> '+l.text; bl.appendChild(d);
+},l.d));
+setTimeout(()=>document.getElementById('boot-bar').style.width='100%',2000);
+setTimeout(()=>{
+  const b=document.getElementById('boot');
+  b.style.transition='opacity .5s'; b.style.opacity='0';
+  setTimeout(()=>{b.style.display='none';document.getElementById('app').style.display='block';},500);
+},4200);
+
+// ── HELPERS ──
+function dots(done,active){
+  for(let i=0;i<3;i++){
+    const d=document.getElementById('sd'+i); d.className='stage-dot';
+    if(i<done)d.classList.add('done'); else if(i===active)d.classList.add('active');
+  }
+  document.getElementById('tb-stage').textContent=active<3?`STAGE ${active+1}/3`:'COMPLETE ✓';
+}
+function goTo(id){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('visible'));
+  const el=document.getElementById(id);
+  el.classList.add('visible','section-enter');
+  setTimeout(()=>el.classList.remove('section-enter'),400);
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// ── S1 ──
+function showBugHint(n){
+  document.getElementById('bh'+n+'-box').classList.add('visible');
+  const b=document.getElementById('bh'+n); b.classList.add('revealed');
+  b.textContent='✓ Подсказка — Баг #'+n+' открыта';
+}
+function chk1(){
+  const code=document.getElementById('code-input').value;
+  const err=document.getElementById('s1-err'), out=document.getElementById('s1-out');
+  err.classList.remove('visible'); out.classList.remove('visible');
+  const checks=[
+    {t:/love_daniel\s*=\s*True/,            m:'❌ Баг #1 — что-то не так. Попробуй ещё.'},
+    {t:/def\s+check_feelings\s*\(\s*name(\s*:\s*str)?\s*\)\s*:/,m:'❌ Баг #2 — что-то не так. Попробуй ещё.'},
+    {t:/check_feelings\s*\(\s*["'](Daniel|daniel)["']/,m:'❌ Баг #3 — что-то не так. Попробуй ещё.'},
+  ];
+  const fail=checks.find(c=>!c.t.test(code));
+  if(fail){err.textContent=fail.m;err.classList.add('visible');return;}
+  out.classList.add('visible');
+  setTimeout(()=>{dots(1,1);goTo('s2');},1800);
+}
+
+// ── S2 ──
+function chk2(){
+  const val=document.getElementById('fix-input').value.trim();
+  const err=document.getElementById('s2-err'), out=document.getElementById('s2-out');
+  err.classList.remove('visible'); out.classList.remove('visible');
+  const ok=/^print\s*\(\s*["']I love Daniel["']\s*\)$/.test(val.replace(/\s+/g,' '));
+  if(!ok){
+    err.textContent=val.toLowerCase().includes('do not')
+      ?'❌ "do not" всё ещё в коде. Убери эти два слова.'
+      :'❌ Не совсем. Попробуй ещё раз.';
+    err.classList.add('visible');return;
+  }
+  out.classList.add('visible');
+  setTimeout(()=>{dots(2,2);goTo('s3');},1600);
+}
+
+// ── S3 ──
+function showCHint(n){
+  if(n===1){
+    document.getElementById('ch1-box').classList.add('visible');
+    const b=document.getElementById('ch1'); b.classList.add('revealed'); b.textContent='✓ Подсказка 1 открыта';
+    document.getElementById('ch2').style.display='';
+  } else {
+    document.getElementById('ch2-box').classList.add('visible');
+    const b=document.getElementById('ch2'); b.classList.add('revealed'); b.textContent='✓ Подсказка 2 открыта';
+  }
+}
+function chk3(){
+  const val=document.getElementById('cipher-input').value.toUpperCase();
+  const err=document.getElementById('s3-err'), out=document.getElementById('s3-out');
+  err.classList.remove('visible'); out.classList.remove('visible');
+  if(!val.includes('ПЯТНИЦА')){err.textContent='❌ Первое слово неверное. Попробуй ещё раз.';err.classList.add('visible');return;}
+  if(!val.includes('ПУШКИНСКАЯ')){err.textContent='❌ Место неверное. Расшифруй второй блок ещё раз.';err.classList.add('visible');return;}
+  out.classList.add('visible');
+  setTimeout(()=>{dots(3,3);goTo('s4');},1600);
+}
+
+// ── S4 ──
+function runInvite(){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('visible'));
+  document.getElementById('reveal').classList.add('visible');
+  launchParticles();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// ── PARTICLES ──
+function launchParticles(){
+  const c=document.getElementById('particles');
+  c.style.display='block';
+  const ctx=c.getContext('2d');
+  c.width=window.innerWidth; c.height=window.innerHeight;
+  const syms=['❤️','💚','✨','💫','⭐','💻','{}','<3','♥','🌿'];
+  const pts=Array.from({length:60},()=>({
+    x:Math.random()*c.width, y:-20-Math.random()*200,
+    vx:(Math.random()-.5)*1.5, vy:1.5+Math.random()*2.5,
+    rot:Math.random()*360, vrot:(Math.random()-.5)*4,
+    sym:syms[Math.floor(Math.random()*syms.length)],
+    size:12+Math.random()*14,
+  }));
+  let fr;
+  (function draw(){
+    ctx.clearRect(0,0,c.width,c.height);
+    let alive=false;
+    pts.forEach(p=>{
+      p.x+=p.vx; p.y+=p.vy; p.rot+=p.vrot;
+      if(p.y<c.height+40){
+        alive=true;
+        ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.rot*Math.PI/180);
+        ctx.font=p.size+'px serif'; ctx.globalAlpha=Math.max(0,1-p.y/c.height);
+        ctx.fillText(p.sym,0,0); ctx.restore();
+      }
+    });
+    if(alive)fr=requestAnimationFrame(draw);
+    else{c.style.display='none';cancelAnimationFrame(fr);}
+  })();
+}
+</script>
+</body>
+</html>
